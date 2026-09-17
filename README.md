@@ -47,13 +47,16 @@ portal por portal, probando entre uno y el siguiente.**
 Domain a un proyecto de Pages no solo "libera" el hostname para que lo tome
 la Route del Worker — **borra directamente el registro DNS que Cloudflare
 había creado** para ese Custom Domain (a diferencia de un registro DNS
-creado a mano, que queda). Le pasó a `emas.lemeit.ar` y `wq.lemeit.ar`
-(quedaron en `NXDOMAIN`, detectado con `nslookup ... 1.1.1.1` para
-descartar caché) — no le pasó a `aq.lemeit.ar`, sin una causa clara todavía.
-Se resuelve igual que el paso 1: un registro `A` dummy (`192.0.2.1`,
-Proxied) por cada subdominio afectado. **Al repetir esta migración con un
-proyecto nuevo, conviene confirmar el DNS con `nslookup` inmediatamente
-después de sacar cada Custom Domain, antes de pasar al siguiente.**
+creado a mano, que queda). Le pasó a `emas.lemeit.ar` y `wq.lemeit.ar` de
+entrada (quedaron en `NXDOMAIN`, detectado con `nslookup ... 1.1.1.1` para
+descartar caché), y a `aq.lemeit.ar` más tarde — en el momento de sacarle
+el Custom Domain había conservado su registro, y dejó de resolver recién
+después, sin un disparador claro. Se resuelve igual que el paso 1: un
+registro `A` dummy (`192.0.2.1`, Proxied) por cada subdominio afectado.
+**Al repetir esta migración con un proyecto nuevo, conviene confirmar el
+DNS con `nslookup` inmediatamente después de sacar cada Custom Domain, y
+no asumir que un subdominio que sobrevivió el primer chequeo está a salvo
+para siempre.**
 
 **5. Actualizar el switcher de portales** en
 `lemeit-design/lemeit-common.js` (`SITES`) para que apunte a
