@@ -65,6 +65,32 @@ export default {
     const upstreamReq = new Request(upstreamUrl, request);
     const resp = await fetch(upstreamReq);
 
+    // Cloudflare Pages redirige automáticamente /archivo.html → /archivo
+    // (sin extensión), con un header Location relativo a la raíz del propio
+    // proyecto de Pages — no tiene ni idea del prefijo /aq, /emas o /wq que
+    // le agregamos acá. Si se lo devolviera tal cual, el browser (que le
+    // pegó a app.lemeit.ar, no al *.pages.dev) resolvería ese Location
+    // contra app.lemeit.ar directo, perdiendo el prefijo de sección y
+    // cayendo en el 404 de más arriba (bug real: pasaba con cualquier
+    // archivo .html secundario, ej. api.html, creditos.html).
+    // Por eso: si el upstream contesta con un redirect hacia su propio
+    // origen, se lo reescribe para que vuelva a incluir el prefijo.
+    if (resp.status >= 300 && resp.status < 400) {
+      const loc = resp.headers.get("Location");
+      if (loc) {
+        const locUrl = new URL(loc, upstreamUrl);
+        if (locUrl.origin === new URL(backend).origin) {
+          const headers = new Headers(resp.headers);
+          headers.set("Location", `/${section}${locUrl.pathname}${locUrl.search}`);
+          return new Response(resp.body, {
+            status: resp.status,
+            statusText: resp.statusText,
+            headers,
+          });
+        }
+      }
+    }
+
     // Se devuelve el response del Pages de origen tal cual (mismo
     // content-type, cache-control, etc.), solo cambia la URL desde la que
     // se sirvió.

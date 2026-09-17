@@ -61,6 +61,22 @@ después de sacar cada Custom Domain, antes de pasar al siguiente.**
 verdad lo de "se abre como navegador" al cambiar de portal, porque pasa a
 ser navegación al mismo origen. Redeploy de `design.lemeit.ar`.
 
+⚠️ **Gotcha real #2, encontrado el 17/9/2026 con `creditos.html` y
+`api.html` dando 404**: Cloudflare Pages redirige automáticamente
+`/archivo.html` → `/archivo` (sin extensión), con un header `Location`
+**relativo a la raíz del propio proyecto de Pages** — no tiene ni idea del
+prefijo `/aq`, `/emas` o `/wq` que le agrega este Worker. La primera versión
+de `src/index.js` devolvía la respuesta del upstream tal cual, así que ese
+`Location` le llegaba crudo al browser (que le pegó a `app.lemeit.ar`, no al
+`*.pages.dev`) y se resolvía contra `app.lemeit.ar` directo — perdiendo el
+prefijo de sección y cayendo en el 404 propio del gateway. Pasaba con
+*cualquier* archivo `.html` que no fuera `index.html` (se confirmó con
+`api.html` de los 3 portales, no solo con el nuevo `creditos.html`).
+Se resuelve reescribiendo el header `Location` cuando el upstream contesta
+un 3xx hacia su propio origen, volviendo a anteponerle el prefijo de sección
+— ver el bloque correspondiente en `src/index.js`, justo antes del
+`return new Response(resp.body, resp)` final.
+
 ## Pendiente / a definir más adelante
 
 - Un `manifest.json` + `sw.js` único en la raíz de `app.lemeit.ar` (con
