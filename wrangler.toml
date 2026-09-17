@@ -1,0 +1,21 @@
+name = "lemeit-gateway"
+main = "src/index.js"
+compatibility_date = "2026-09-17"
+
+# Gateway único para los 3 portales de la Red Ambiental bajo un solo origen
+# (app.lemeit.ar/aq, /emas, /wq) — para que, una vez instalada la PWA, pasar
+# de un portal a otro sea navegación interna y no "se abra el navegador".
+#
+# También hace de redirect permanente para los subdominios viejos
+# (aq.lemeit.ar, emas.lemeit.ar, wq.lemeit.ar) una vez que se les saque el
+# Custom Domain de sus respectivos proyectos de Cloudflare Pages — ver
+# README.md de este repo para el orden exacto de los pasos.
+routes = [
+  { pattern = "app.lemeit.ar/*", zone_name = "lemeit.ar" },
+  { pattern = "aq.lemeit.ar/*", zone_name = "lemeit.ar" },
+  { pattern = "emas.lemeit.ar/*", zone_name = "lemeit.ar" },
+  { pattern = "wq.lemeit.ar/*", zone_name = "lemeit.ar" }
+]
+# Sin esto Wrangler apaga el *.workers.dev en cuanto hay "routes" en el
+# archivo (ver el mismo comentario en lemeit-aq/worker/wrangler.toml).
+workers_dev = true
