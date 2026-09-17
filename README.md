@@ -4,88 +4,69 @@ Worker de Cloudflare que unifica los 3 portales de la Red Ambiental
 (`aq.lemeit.ar`, `emas.lemeit.ar`, `wq.lemeit.ar`) bajo un solo origen,
 **`app.lemeit.ar`**, para que una vez instalada la PWA cambiar de portal sea
 navegación interna en vez de abrir el navegador — y redirige los 3
-subdominios viejos hacia el nuevo dominio (`aq.lemeit.ar` → ya divulgado en
-la reunión, se redirige desde el día 1; `emas`/`wq` se redirigen también,
-aunque todavía no se divulgaron con el nombre viejo).
+subdominios viejos hacia el nuevo dominio.
 
 No reemplaza ni fusiona los repos de cada portal (`lemeit-aq`, `lemeit-emas`,
 `lemeit-wq`) — siguen siendo proyectos y deploys de Cloudflare Pages
 independientes. Este Worker es solo una capa de ruteo fina arriba, mismo
-patrón que ya usa `lemeit-aq/worker` para `api.lemeit.ar/aq`.
+patrón que ya usan `lemeit-aq/worker` y `lemeit-emas/worker` para
+`api.lemeit.ar/aq` y `api.lemeit.ar/emas`.
 
-## Orden de pasos (importante hacerlo en este orden, es un dominio ya
-público y con `aq.lemeit.ar` ya divulgado)
+**Estado: migrado y en producción (17/9/2026)**. Los 3 portales sirven desde
+`app.lemeit.ar/aq`, `/emas`, `/wq`; los 3 subdominios viejos redirigen (301)
+ahí; el switcher de portales (`lemeit-design/lemeit-common.js`) ya apunta a
+las URLs nuevas; el `manifest.json` de Monitoreo Ambiental Escolar (la única
+app instalable de las 3 por ahora) amplió su `scope` de `/aq/` a `/` para
+que alternar de portal desde la app instalada no salga al navegador.
 
-**1. Crear el repo y el DNS — sin riesgo, nada roto todavía**
+## Cómo se hizo (orden de pasos, para referencia futura)
 
-```powershell
-# Crear el repo lemeit-gateway en GitHub (vacío), después:
-git clone https://github.com/lemeit/lemeit-gateway.git
-# copiar wrangler.toml y src/index.js de este paquete al repo
-cd lemeit-gateway
-git add wrangler.toml src/index.js README.md
-git commit -m "feat: gateway inicial para app.lemeit.ar"
-git push
-```
+**1. Crear el repo y el DNS**
 
-En Cloudflare Dashboard → DNS de `lemeit.ar`, agregar un registro dummy
-(igual que se hizo para `api.lemeit.ar`) para que Cloudflare intercepte el
-hostname nuevo:
+Se creó este repo, se copiaron `wrangler.toml` y `src/index.js`, y en
+Cloudflare Dashboard → DNS de `lemeit.ar` se agregó un registro dummy para
+que Cloudflare intercepte el hostname nuevo:
 
 | Tipo | Nombre | Contenido | Proxy |
 |---|---|---|---|
 | A | `app` | `192.0.2.1` | Proxied (nube naranja) |
 
-**2. Deployar el Worker — todavía sin riesgo**
+**2. Deployar el Worker (`npx wrangler deploy`)** — con las 4 Routes ya en
+`wrangler.toml` (`app`/`aq`/`emas`/`wq.lemeit.ar`), pero mientras el Custom
+Domain de cada Pages siguiera activo en su subdominio viejo, ese Custom
+Domain le seguía ganando a la Route del Worker en el mismo hostname — así
+que nada se rompía todavía en ese punto.
 
-```powershell
-cd lemeit-gateway
-npx wrangler deploy
-```
+**3. Probar `app.lemeit.ar/aq/`, `/emas/`, `/wq/`** antes de tocar nada más:
+datos, íconos, CSS de `design.lemeit.ar`, switcher de portales.
 
-Con esto `app.lemeit.ar/aq/`, `/emas/`, `/wq/` ya deberían andar — pero
-`aq.lemeit.ar`, `emas.lemeit.ar` y `wq.lemeit.ar` **siguen sirviendo el sitio
-directo como hasta ahora**, porque el Custom Domain de cada Pages todavía
-apunta ahí (un Worker Route no le gana a un Custom Domain de Pages en el
-mismo hostname). Nada se rompe todavía.
+**4. Recién ahí, sacar el Custom Domain viejo de cada proyecto de Pages —
+portal por portal, probando entre uno y el siguiente.**
 
-**3. Probar antes de tocar nada más**
+⚠️ **Gotcha real, no anticipado en el plan original**: sacarle el Custom
+Domain a un proyecto de Pages no solo "libera" el hostname para que lo tome
+la Route del Worker — **borra directamente el registro DNS que Cloudflare
+había creado** para ese Custom Domain (a diferencia de un registro DNS
+creado a mano, que queda). Le pasó a `emas.lemeit.ar` y `wq.lemeit.ar`
+(quedaron en `NXDOMAIN`, detectado con `nslookup ... 1.1.1.1` para
+descartar caché) — no le pasó a `aq.lemeit.ar`, sin una causa clara todavía.
+Se resuelve igual que el paso 1: un registro `A` dummy (`192.0.2.1`,
+Proxied) por cada subdominio afectado. **Al repetir esta migración con un
+proyecto nuevo, conviene confirmar el DNS con `nslookup` inmediatamente
+después de sacar cada Custom Domain, antes de pasar al siguiente.**
 
-Abrir `https://app.lemeit.ar/aq/`, `https://app.lemeit.ar/emas/` y
-`https://app.lemeit.ar/wq/` y confirmar que cada portal carga bien: datos,
-íconos, CSS de `design.lemeit.ar`, el switcher de portales (todavía va a
-llevar a los subdominios viejos, eso se cambia en el paso 5).
-
-**4. Recién ahora, sacar el Custom Domain viejo — portal por portal**
-
-En Cloudflare Dashboard → Workers & Pages:
-
-- Proyecto `purpleair-saladillo` → Custom domains → quitar `aq.lemeit.ar`
-  (esto es lo urgente, ya divulgado en la reunión).
-- Probar `https://aq.lemeit.ar` → debería redirigir a
-  `https://app.lemeit.ar/aq/`.
-- Si anda bien, repetir con `ema-saladillo` (quitar `emas.lemeit.ar`) y
-  `agua-saladillo` (quitar `wq.lemeit.ar`).
-
-Quitar el Custom Domain NO borra el deploy — el proyecto sigue publicado en
-su `*.pages.dev`, que es justamente lo que este Worker usa como origen. Por
-eso el orden importa: si se saca el Custom Domain antes de que el Worker
-esté deployado y probado, esos 3 sitios quedan momentáneamente sin servir
-nada.
-
-**5. Actualizar el switcher de portales**
-
-Recién en este punto, en `lemeit-design/lemeit-common.js`, cambiar el
-`SITES` array para que las URLs apunten a `https://app.lemeit.ar/aq`,
-`/emas`, `/wq` en vez de los subdominios viejos — ahí es donde realmente se
-resuelve lo de "se abre como navegador" al cambiar de portal, porque pasa a
-ser navegación al mismo origen. Redeployar `design.lemeit.ar`.
+**5. Actualizar el switcher de portales** en
+`lemeit-design/lemeit-common.js` (`SITES`) para que apunte a
+`https://app.lemeit.ar/aq`, `/emas`, `/wq` — ahí es donde se resuelve de
+verdad lo de "se abre como navegador" al cambiar de portal, porque pasa a
+ser navegación al mismo origen. Redeploy de `design.lemeit.ar`.
 
 ## Pendiente / a definir más adelante
 
 - Un `manifest.json` + `sw.js` único en la raíz de `app.lemeit.ar` (con
   `scope: "/"`) para que el sistema ofrezca instalar una sola app en vez de
-  una por portal — por ahora cada portal sigue con su propio manifest
-  (`emas`/`wq` todavía no tienen uno, eso es aparte).
+  una por portal — por ahora la única instalable es Monitoreo Ambiental
+  Escolar (con `scope` ya ampliado a `/`); `emas` y `wq` todavía no tienen
+  manifest propio.
 - Qué ícono/color usa la app unificada (ninguno de los 3 actuales es
   "neutral" entre los tres portales).
