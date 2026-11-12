@@ -1,5 +1,8 @@
 # lemeit-gateway
 
+[![sitio: app.lemeit.ar](https://img.shields.io/badge/sitio-app.lemeit.ar-009688?style=flat-square&labelColor=555555)](https://app.lemeit.ar/aq/)
+[![docs: red ambiental](https://img.shields.io/badge/docs-red%20ambiental-009688?style=flat-square&labelColor=555555)](https://wiki.lemeit.ar/red-ambiental/)
+
 Worker de Cloudflare que unifica los 3 portales de la Red Ambiental
 (`aq.lemeit.ar`, `emas.lemeit.ar`, `wq.lemeit.ar`) bajo un solo origen,
 **`app.lemeit.ar`**, para que una vez instalada la PWA cambiar de portal sea
